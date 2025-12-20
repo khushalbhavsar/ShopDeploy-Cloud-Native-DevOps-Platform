@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: frontend
+data:
+  # Note: Frontend env vars are baked in at build time for Vite
+  # This is for reference - rebuild image with correct VITE_API_URL
+  VITE_API_URL: "http://localhost:5000/api"
