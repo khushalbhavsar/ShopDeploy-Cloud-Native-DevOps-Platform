@@ -41,13 +41,9 @@ podAnnotations:
   prometheus.io/port: "5000"
   prometheus.io/path: "/api/health/metrics"
 
-podSecurityContext:
-  runAsNonRoot: true
-  runAsUser: 1001
-  fsGroup: 1001
+podSecurityContext: {}
 
-securityContext:
-  allowPrivilegeEscalation: false
+securityContext: {}
   capabilities:
     drop:
       - ALL

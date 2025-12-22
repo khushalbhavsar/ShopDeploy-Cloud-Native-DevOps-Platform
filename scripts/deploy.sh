@@ -118,6 +118,26 @@ deploy_configs() {
 }
 
 #------------------------------------------------------------------------------
+# Deploy MongoDB
+#------------------------------------------------------------------------------
+deploy_mongodb() {
+    log_step "Deploying MongoDB..."
+    
+    # Check if MongoDB is already running
+    if kubectl get statefulset mongodb -n ${K8S_NAMESPACE} &>/dev/null; then
+        log_info "MongoDB is already deployed"
+        return 0
+    fi
+    
+    # Deploy MongoDB
+    kubectl apply -f "${PROJECT_ROOT}/k8s/mongodb-statefulset.yaml"
+    
+    # Wait for MongoDB to be ready
+    log_info "Waiting for MongoDB to be ready..."
+    kubectl rollout status statefulset/mongodb -n ${K8S_NAMESPACE} --timeout=5m || log_warn "MongoDB may not be fully ready yet"
+}
+
+#------------------------------------------------------------------------------
 # Canary Deployment (Progressive Rollout)
 #------------------------------------------------------------------------------
 canary_deploy() {
@@ -155,6 +175,9 @@ kubectl cluster-info || log_error "Cannot connect to Kubernetes cluster"
 
 # Deploy configs first
 deploy_configs
+
+# Deploy MongoDB (required for backend)
+deploy_mongodb
 
 # Check for canary deployment
 if [ "${CANARY}" == "--canary" ]; then
