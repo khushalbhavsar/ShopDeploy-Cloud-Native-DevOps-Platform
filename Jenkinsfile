@@ -918,6 +918,7 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     sh '''
+                    chmod +x scripts/push.sh
                     aws ecr get-login-password --region ${AWS_REGION} \
                     | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
@@ -932,6 +933,7 @@ pipeline {
             when { expression { params.ENVIRONMENT != 'prod' } }
             steps {
                 sh '''
+                chmod +x scripts/deploy.sh
                 aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
                 scripts/deploy.sh backend ${IMAGE_TAG} ${ENVIRONMENT}
                 scripts/deploy.sh frontend ${IMAGE_TAG} ${ENVIRONMENT}
@@ -950,6 +952,7 @@ pipeline {
             when { expression { params.ENVIRONMENT == 'prod' } }
             steps {
                 sh '''
+                chmod +x scripts/deploy.sh
                 aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
                 scripts/deploy.sh backend ${IMAGE_TAG} prod
                 scripts/deploy.sh frontend ${IMAGE_TAG} prod
