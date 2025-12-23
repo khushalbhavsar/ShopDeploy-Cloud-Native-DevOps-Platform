@@ -836,9 +836,7 @@ pipeline {
 
         stage('Checkout') {
             steps {
-                ansiColor('xterm') {
-                    checkout scm
-                }
+                checkout scm
             }
         }
 
@@ -847,10 +845,8 @@ pipeline {
                 stage('Backend Deps') {
                     when { expression { env.BACKEND_CHANGED == 'true' } }
                     steps {
-                        ansiColor('xterm') {
-                            dir("${BACKEND_DIR}") {
-                                sh 'npm ci'
-                            }
+                        dir("${BACKEND_DIR}") {
+                            sh 'npm ci'
                         }
                     }
                 }
@@ -858,10 +854,8 @@ pipeline {
                 stage('Frontend Deps') {
                     when { expression { env.FRONTEND_CHANGED == 'true' } }
                     steps {
-                        ansiColor('xterm') {
-                            dir("${FRONTEND_DIR}") {
-                                sh 'npm ci'
-                            }
+                        dir("${FRONTEND_DIR}") {
+                            sh 'npm ci'
                         }
                     }
                 }
@@ -871,14 +865,12 @@ pipeline {
         stage('Code Quality (SonarQube)') {
             when { expression { !params.SKIP_SONAR } }
             steps {
-                ansiColor('xterm') {
-                    withSonarQubeEnv('SonarQube') {
-                        sh """
-                        npx sonar-scanner \
-                          -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
-                          -Dsonar.sources=.
-                        """
-                    }
+                withSonarQubeEnv('SonarQube') {
+                    sh """
+                    npx sonar-scanner \
+                      -Dsonar.projectKey=${SONAR_PROJECT_KEY} \
+                      -Dsonar.sources=.
+                    """
                 }
             }
         }
@@ -886,10 +878,8 @@ pipeline {
         stage('Quality Gate') {
             when { expression { !params.SKIP_SONAR } }
             steps {
-                ansiColor('xterm') {
-                    timeout(time: 5, unit: 'MINUTES') {
-                        waitForQualityGate abortPipeline: true
-                    }
+                timeout(time: 5, unit: 'MINUTES') {
+                    waitForQualityGate abortPipeline: true
                 }
             }
         }
@@ -899,19 +889,15 @@ pipeline {
             parallel {
                 stage('Backend Tests') {
                     steps {
-                        ansiColor('xterm') {
-                            dir("${BACKEND_DIR}") {
-                                sh 'npm test || true'
-                            }
+                        dir("${BACKEND_DIR}") {
+                            sh 'npm test || true'
                         }
                     }
                 }
                 stage('Frontend Tests') {
                     steps {
-                        ansiColor('xterm') {
-                            dir("${FRONTEND_DIR}") {
-                                sh 'npm test || true'
-                            }
+                        dir("${FRONTEND_DIR}") {
+                            sh 'npm test || true'
                         }
                     }
                 }
@@ -920,28 +906,24 @@ pipeline {
 
         stage('Docker Build') {
             steps {
-                ansiColor('xterm') {
-                    sh '''
-                    chmod +x scripts/build.sh
-                    scripts/build.sh backend ${IMAGE_TAG}
-                    scripts/build.sh frontend ${IMAGE_TAG}
-                    '''
-                }
+                sh '''
+                chmod +x scripts/build.sh
+                scripts/build.sh backend ${IMAGE_TAG}
+                scripts/build.sh frontend ${IMAGE_TAG}
+                '''
             }
         }
 
         stage('Push to ECR') {
             steps {
-                ansiColor('xterm') {
-                    withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
-                        sh '''
-                        aws ecr get-login-password --region ${AWS_REGION} \
-                        | docker login --username AWS --password-stdin ${ECR_REGISTRY}
+                withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
+                    sh '''
+                    aws ecr get-login-password --region ${AWS_REGION} \
+                    | docker login --username AWS --password-stdin ${ECR_REGISTRY}
 
-                        scripts/push.sh backend ${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_BACKEND_REPO}
-                        scripts/push.sh frontend ${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_FRONTEND_REPO}
-                        '''
-                    }
+                    scripts/push.sh backend ${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_BACKEND_REPO}
+                    scripts/push.sh frontend ${IMAGE_TAG} ${ECR_REGISTRY}/${ECR_FRONTEND_REPO}
+                    '''
                 }
             }
         }
@@ -949,13 +931,11 @@ pipeline {
         stage('Deploy to Dev/Staging') {
             when { expression { params.ENVIRONMENT != 'prod' } }
             steps {
-                ansiColor('xterm') {
-                    sh '''
-                    aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
-                    scripts/deploy.sh backend ${IMAGE_TAG} ${ENVIRONMENT}
-                    scripts/deploy.sh frontend ${IMAGE_TAG} ${ENVIRONMENT}
-                    '''
-                }
+                sh '''
+                aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                scripts/deploy.sh backend ${IMAGE_TAG} ${ENVIRONMENT}
+                scripts/deploy.sh frontend ${IMAGE_TAG} ${ENVIRONMENT}
+                '''
             }
         }
 
@@ -969,33 +949,27 @@ pipeline {
         stage('Deploy to Production') {
             when { expression { params.ENVIRONMENT == 'prod' } }
             steps {
-                ansiColor('xterm') {
-                    sh '''
-                    aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
-                    scripts/deploy.sh backend ${IMAGE_TAG} prod
-                    scripts/deploy.sh frontend ${IMAGE_TAG} prod
-                    '''
-                }
+                sh '''
+                aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
+                scripts/deploy.sh backend ${IMAGE_TAG} prod
+                scripts/deploy.sh frontend ${IMAGE_TAG} prod
+                '''
             }
         }
 
         stage('Smoke Tests') {
             steps {
-                ansiColor('xterm') {
-                    sh '''
-                    kubectl get pods -n ${K8S_NAMESPACE}
-                    kubectl rollout status deployment/shopdeploy-backend -n ${K8S_NAMESPACE}
-                    kubectl rollout status deployment/shopdeploy-frontend -n ${K8S_NAMESPACE}
-                    '''
-                }
+                sh '''
+                kubectl get pods -n ${K8S_NAMESPACE}
+                kubectl rollout status deployment/shopdeploy-backend -n ${K8S_NAMESPACE}
+                kubectl rollout status deployment/shopdeploy-frontend -n ${K8S_NAMESPACE}
+                '''
             }
         }
 
         stage('Cleanup') {
             steps {
-                ansiColor('xterm') {
-                    sh 'docker system prune -f || true'
-                }
+                sh 'docker system prune -f || true'
             }
         }
     }
