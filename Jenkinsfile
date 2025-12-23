@@ -144,14 +144,15 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     sh '''
-                    # Install kubectl if not present
+                    # Install kubectl if not present in PATH
                     if ! command -v kubectl &> /dev/null; then
-                        echo "Installing kubectl..."
+                        echo "Installing kubectl to workspace..."
+                        mkdir -p ${WORKSPACE}/bin
                         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                         chmod +x kubectl
-                        sudo mv kubectl /usr/local/bin/ || mv kubectl ./kubectl
-                        export PATH=$PATH:$(pwd)
+                        mv kubectl ${WORKSPACE}/bin/
                     fi
+                    export PATH=${WORKSPACE}/bin:$PATH
                     
                     chmod +x scripts/deploy.sh
                     aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
@@ -174,14 +175,15 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     sh '''
-                    # Install kubectl if not present
+                    # Install kubectl if not present in PATH
                     if ! command -v kubectl &> /dev/null; then
-                        echo "Installing kubectl..."
+                        echo "Installing kubectl to workspace..."
+                        mkdir -p ${WORKSPACE}/bin
                         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                         chmod +x kubectl
-                        sudo mv kubectl /usr/local/bin/ || mv kubectl ./kubectl
-                        export PATH=$PATH:$(pwd)
+                        mv kubectl ${WORKSPACE}/bin/
                     fi
+                    export PATH=${WORKSPACE}/bin:$PATH
                     
                     chmod +x scripts/deploy.sh
                     aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
@@ -196,14 +198,15 @@ pipeline {
             steps {
                 withCredentials([[$class: 'AmazonWebServicesCredentialsBinding', credentialsId: 'aws-credentials']]) {
                     sh '''
-                    # Install kubectl if not present
-                    if ! command -v kubectl &> /dev/null; then
-                        echo "Installing kubectl..."
+                    # Install kubectl if not present in PATH
+                    if ! command -v kubectl &> /dev/null && [ ! -f ${WORKSPACE}/bin/kubectl ]; then
+                        echo "Installing kubectl to workspace..."
+                        mkdir -p ${WORKSPACE}/bin
                         curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
                         chmod +x kubectl
-                        sudo mv kubectl /usr/local/bin/ || mv kubectl ./kubectl
-                        export PATH=$PATH:$(pwd)
+                        mv kubectl ${WORKSPACE}/bin/
                     fi
+                    export PATH=${WORKSPACE}/bin:$PATH
                     
                     aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
                     kubectl get pods -n ${K8S_NAMESPACE}
