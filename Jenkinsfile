@@ -471,10 +471,17 @@ pipeline {
                         # Install helm if not present
                         if [ ! -f ${WORKSPACE}/bin/helm ]; then
                             echo "📥 Installing helm..."
-                            curl -fsSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz
-                            mv linux-amd64/helm ${WORKSPACE}/bin/
-                            rm -rf linux-amd64
+                            curl -fsSL -o /tmp/helm.tar.gz https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz
+                            tar -zxf /tmp/helm.tar.gz -C /tmp
+                            mv /tmp/linux-amd64/helm ${WORKSPACE}/bin/
+                            rm -rf /tmp/linux-amd64 /tmp/helm.tar.gz
+                            chmod +x ${WORKSPACE}/bin/helm
+                            echo "✅ Helm installed successfully"
                         fi
+                        
+                        # Verify helm
+                        echo "📋 Helm version:"
+                        ${WORKSPACE}/bin/helm version --short
                         
                         # Configure kubectl for EKS
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
@@ -581,10 +588,17 @@ pipeline {
                         # Install helm if not present
                         if [ ! -f ${WORKSPACE}/bin/helm ]; then
                             echo "📥 Installing helm..."
-                            curl -fsSL https://get.helm.sh/helm-v3.14.0-linux-amd64.tar.gz | tar xz
-                            mv linux-amd64/helm ${WORKSPACE}/bin/
-                            rm -rf linux-amd64
+                            curl -fsSL -o /tmp/helm.tar.gz https://get.helm.sh/helm-v3.16.3-linux-amd64.tar.gz
+                            tar -zxf /tmp/helm.tar.gz -C /tmp
+                            mv /tmp/linux-amd64/helm ${WORKSPACE}/bin/
+                            rm -rf /tmp/linux-amd64 /tmp/helm.tar.gz
+                            chmod +x ${WORKSPACE}/bin/helm
+                            echo "✅ Helm installed successfully"
                         fi
+                        
+                        # Verify helm
+                        echo "📋 Helm version:"
+                        ${WORKSPACE}/bin/helm version --short
                         
                         # Configure kubectl for EKS
                         aws eks update-kubeconfig --region ${AWS_REGION} --name ${EKS_CLUSTER_NAME}
