@@ -494,7 +494,7 @@ pipeline {
                             --set image.tag=${IMAGE_TAG} \
                             --set global.environment=${DEPLOY_ENV} \
                             --wait \
-                            --timeout 10m
+                            --timeout 5m
                         
                         # Deploy frontend
                         echo "🎨 Deploying frontend..."
@@ -505,7 +505,7 @@ pipeline {
                             --set image.tag=${IMAGE_TAG} \
                             --set global.environment=${DEPLOY_ENV} \
                             --wait \
-                            --timeout 10m
+                            --timeout 5m
                         
                         echo "✅ Deployment to ${DEPLOY_ENV} completed"
                     '''

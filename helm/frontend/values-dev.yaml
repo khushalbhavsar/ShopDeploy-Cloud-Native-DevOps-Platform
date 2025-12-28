@@ -33,7 +33,7 @@ autoscaling:
 # Environment Variables
 #------------------------------------------------------------------------------
 env:
-  VITE_API_URL: "http://localhost:5000"
+  VITE_API_URL: "http://shopdeploy-backend:5000"
 
 #------------------------------------------------------------------------------
 # Service Configuration
@@ -41,6 +41,7 @@ env:
 service:
   type: ClusterIP
   port: 80
+  targetPort: 80
 
 #------------------------------------------------------------------------------
 # Ingress - Disabled for development
@@ -53,3 +54,36 @@ ingress:
 #------------------------------------------------------------------------------
 podDisruptionBudget:
   enabled: false
+
+#------------------------------------------------------------------------------
+# ConfigMap and Secrets - Disabled for development
+#------------------------------------------------------------------------------
+configMapRef:
+  enabled: false
+
+secretRef:
+  enabled: false
+
+#------------------------------------------------------------------------------
+# Probes - Fast for Nginx (serves static files)
+#------------------------------------------------------------------------------
+livenessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 10
+  periodSeconds: 30
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /
+    port: 80
+  initialDelaySeconds: 5
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+# Disable startup probe for faster deployment
+startupProbe: {}
