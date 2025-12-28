@@ -15,7 +15,12 @@ resources:
   - mongodb-statefulset.yaml
   - ingress.yaml
   - hpa.yaml
+  - pdb.yaml
+  - network-policy.yaml
+  - resource-quota.yaml
 
-commonLabels:
-  app: shopdeploy
-  managed-by: kustomize
+labels:
+  - pairs:
+      app: shopdeploy
+      managed-by: kustomize
+    includeSelectors: false

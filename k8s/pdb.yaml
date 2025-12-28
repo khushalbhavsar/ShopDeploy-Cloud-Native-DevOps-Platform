@@ -1,0 +1,29 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: backend-pdb
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: backend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: shopdeploy
+      component: backend
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: frontend-pdb
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: frontend
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: shopdeploy
+      component: frontend

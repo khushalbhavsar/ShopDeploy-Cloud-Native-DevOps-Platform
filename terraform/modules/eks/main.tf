@@ -112,9 +112,9 @@ resource "aws_eks_node_group" "main" {
   }
 
   tags = merge(var.tags, {
-    Name = "${var.cluster_name}-node-group"
-    "kubernetes.io/cluster/${var.cluster_name}" = "owned"
-    "k8s.io/cluster-autoscaler/enabled"         = "true"
+    Name                                            = "${var.cluster_name}-node-group"
+    "kubernetes.io/cluster/${var.cluster_name}"     = "owned"
+    "k8s.io/cluster-autoscaler/enabled"             = "true"
     "k8s.io/cluster-autoscaler/${var.cluster_name}" = "owned"
   })
 

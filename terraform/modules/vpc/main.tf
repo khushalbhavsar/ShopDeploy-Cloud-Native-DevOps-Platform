@@ -12,7 +12,7 @@ resource "aws_vpc" "main" {
   enable_dns_support   = true
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-vpc"
+    Name                                        = "${var.project_name}-${var.environment}-vpc"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
   })
 }
@@ -40,7 +40,7 @@ resource "aws_subnet" "public" {
   map_public_ip_on_launch = true
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-public-${var.availability_zones[count.index]}"
+    Name                                        = "${var.project_name}-${var.environment}-public-${var.availability_zones[count.index]}"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
     "kubernetes.io/role/elb"                    = "1"
   })
@@ -57,7 +57,7 @@ resource "aws_subnet" "private" {
   availability_zone = var.availability_zones[count.index]
 
   tags = merge(var.tags, {
-    Name = "${var.project_name}-${var.environment}-private-${var.availability_zones[count.index]}"
+    Name                                        = "${var.project_name}-${var.environment}-private-${var.availability_zones[count.index]}"
     "kubernetes.io/cluster/${var.cluster_name}" = "shared"
     "kubernetes.io/role/internal-elb"           = "1"
   })
@@ -150,11 +150,11 @@ resource "aws_route_table_association" "private" {
 resource "aws_flow_log" "main" {
   count = var.enable_flow_logs ? 1 : 0
 
-  vpc_id                   = aws_vpc.main.id
-  traffic_type             = "ALL"
-  log_destination_type     = "cloud-watch-logs"
-  log_destination          = aws_cloudwatch_log_group.flow_logs[0].arn
-  iam_role_arn             = aws_iam_role.flow_logs[0].arn
+  vpc_id               = aws_vpc.main.id
+  traffic_type         = "ALL"
+  log_destination_type = "cloud-watch-logs"
+  log_destination      = aws_cloudwatch_log_group.flow_logs[0].arn
+  iam_role_arn         = aws_iam_role.flow_logs[0].arn
 
   tags = merge(var.tags, {
     Name = "${var.project_name}-${var.environment}-flow-logs"

@@ -6,10 +6,20 @@ metadata:
   labels:
     app: shopdeploy
   annotations:
+    # NGINX Ingress Controller annotations
     nginx.ingress.kubernetes.io/rewrite-target: /
     nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "*"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
     # Uncomment for SSL/TLS
     # cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    # AWS ALB Ingress Controller annotations (alternative)
+    # kubernetes.io/ingress.class: alb
+    # alb.ingress.kubernetes.io/scheme: internet-facing
+    # alb.ingress.kubernetes.io/target-type: ip
+    # alb.ingress.kubernetes.io/healthcheck-path: /api/health/health
 spec:
   ingressClassName: nginx
   rules:

@@ -99,3 +99,16 @@ output "ecr_login_command" {
   description = "Command to login to ECR"
   value       = "aws ecr get-login-password --region ${var.aws_region} | docker login --username AWS --password-stdin ${data.aws_caller_identity.current.account_id}.dkr.ecr.${var.aws_region}.amazonaws.com"
 }
+
+#------------------------------------------------------------------------------
+# OIDC Provider Outputs
+#------------------------------------------------------------------------------
+output "oidc_provider_arn" {
+  description = "ARN of the OIDC Provider for IRSA"
+  value       = module.eks.oidc_provider_arn
+}
+
+output "oidc_provider_url" {
+  description = "URL of the OIDC Provider"
+  value       = module.eks.oidc_provider_url
+}

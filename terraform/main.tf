@@ -19,6 +19,10 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.11"
     }
+    tls = {
+      source  = "hashicorp/tls"
+      version = "~> 4.0"
+    }
   }
 
   # Remote Backend Configuration - S3 + DynamoDB for State Locking
@@ -49,15 +53,6 @@ provider "aws" {
 }
 
 #------------------------------------------------------------------------------
-# Data Sources
-#------------------------------------------------------------------------------
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
-data "aws_caller_identity" "current" {}
-
-#------------------------------------------------------------------------------
 # Local Variables
 #------------------------------------------------------------------------------
 locals {
@@ -67,6 +62,8 @@ locals {
     Environment = var.environment
     ManagedBy   = "Terraform"
   }
+  # Use availability zones from data source
+  azs = slice(data.aws_availability_zones.available.names, 0, 3)
 }
 
 #------------------------------------------------------------------------------
@@ -75,15 +72,15 @@ locals {
 module "vpc" {
   source = "./modules/vpc"
 
-  project_name        = var.project_name
-  environment         = var.environment
-  vpc_cidr            = var.vpc_cidr
-  availability_zones  = slice(data.aws_availability_zones.available.names, 0, 3)
-  public_subnet_cidrs = var.public_subnet_cidrs
+  project_name         = var.project_name
+  environment          = var.environment
+  vpc_cidr             = var.vpc_cidr
+  availability_zones   = local.azs
+  public_subnet_cidrs  = var.public_subnet_cidrs
   private_subnet_cidrs = var.private_subnet_cidrs
-  enable_nat_gateway  = var.enable_nat_gateway
-  single_nat_gateway  = var.single_nat_gateway
-  cluster_name        = local.cluster_name
+  enable_nat_gateway   = var.enable_nat_gateway
+  single_nat_gateway   = var.single_nat_gateway
+  cluster_name         = local.cluster_name
 
   tags = local.common_tags
 }
@@ -124,21 +121,21 @@ module "ecr" {
 module "eks" {
   source = "./modules/eks"
 
-  project_name          = var.project_name
-  environment           = var.environment
-  cluster_name          = local.cluster_name
-  cluster_version       = var.eks_cluster_version
-  vpc_id                = module.vpc.vpc_id
-  private_subnet_ids    = module.vpc.private_subnet_ids
-  eks_cluster_role_arn  = module.iam.eks_cluster_role_arn
-  eks_node_role_arn     = module.iam.eks_node_role_arn
+  project_name         = var.project_name
+  environment          = var.environment
+  cluster_name         = local.cluster_name
+  cluster_version      = var.eks_cluster_version
+  vpc_id               = module.vpc.vpc_id
+  private_subnet_ids   = module.vpc.private_subnet_ids
+  eks_cluster_role_arn = module.iam.eks_cluster_role_arn
+  eks_node_role_arn    = module.iam.eks_node_role_arn
 
   # Node Group Configuration
-  node_instance_types   = var.eks_node_instance_types
-  node_desired_size     = var.eks_node_desired_size
-  node_min_size         = var.eks_node_min_size
-  node_max_size         = var.eks_node_max_size
-  node_disk_size        = var.eks_node_disk_size
+  node_instance_types = var.eks_node_instance_types
+  node_desired_size   = var.eks_node_desired_size
+  node_min_size       = var.eks_node_min_size
+  node_max_size       = var.eks_node_max_size
+  node_disk_size      = var.eks_node_disk_size
 
   # Enable Add-ons
   enable_cluster_autoscaler = true

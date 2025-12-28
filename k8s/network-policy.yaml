@@ -1,0 +1,149 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backend-network-policy
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: backend
+spec:
+  podSelector:
+    matchLabels:
+      app: shopdeploy
+      component: backend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from frontend pods
+    - from:
+        - podSelector:
+            matchLabels:
+              app: shopdeploy
+              component: frontend
+      ports:
+        - protocol: TCP
+          port: 5000
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 5000
+    # Allow traffic from same namespace (monitoring, etc.)
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 5000
+  egress:
+    # Allow traffic to MongoDB
+    - to:
+        - podSelector:
+            matchLabels:
+              app: shopdeploy
+              component: mongodb
+      ports:
+        - protocol: TCP
+          port: 27017
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+    # Allow external HTTPS (for Stripe, Cloudinary, etc.)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+            except:
+              - 10.0.0.0/8
+              - 172.16.0.0/12
+              - 192.168.0.0/16
+      ports:
+        - protocol: TCP
+          port: 443
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: frontend-network-policy
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: frontend
+spec:
+  podSelector:
+    matchLabels:
+      app: shopdeploy
+      component: frontend
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Allow traffic from ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 80
+    # Allow traffic from any pod in namespace
+    - from:
+        - podSelector: {}
+      ports:
+        - protocol: TCP
+          port: 80
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mongodb-network-policy
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: mongodb
+spec:
+  podSelector:
+    matchLabels:
+      app: shopdeploy
+      component: mongodb
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Only allow traffic from backend
+    - from:
+        - podSelector:
+            matchLabels:
+              app: shopdeploy
+              component: backend
+      ports:
+        - protocol: TCP
+          port: 27017
+  egress:
+    # Allow DNS resolution
+    - to:
+        - namespaceSelector: {}
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53

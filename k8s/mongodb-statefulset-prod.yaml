@@ -1,0 +1,113 @@
+# MongoDB StatefulSet for Production (with Persistent Storage)
+# Use this instead of mongodb-statefulset.yaml for production environments
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mongodb
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: mongodb
+spec:
+  serviceName: mongodb-headless
+  replicas: 1
+  selector:
+    matchLabels:
+      app: shopdeploy
+      component: mongodb
+  template:
+    metadata:
+      labels:
+        app: shopdeploy
+        component: mongodb
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        fsGroup: 999
+      containers:
+        - name: mongodb
+          image: mongo:7.0
+          ports:
+            - containerPort: 27017
+              name: mongodb
+          volumeMounts:
+            - name: mongodb-data
+              mountPath: /data/db
+          env:
+            - name: MONGO_INITDB_DATABASE
+              value: shopdeploy
+          resources:
+            requests:
+              memory: "512Mi"
+              cpu: "500m"
+            limits:
+              memory: "1Gi"
+              cpu: "1000m"
+          livenessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command:
+                - mongosh
+                - --eval
+                - "db.adminCommand('ping')"
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+  volumeClaimTemplates:
+    - metadata:
+        name: mongodb-data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        storageClassName: gp3  # Use appropriate storage class for your cloud provider
+        resources:
+          requests:
+            storage: 10Gi
+---
+# Headless Service for StatefulSet
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongodb-headless
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: mongodb
+spec:
+  clusterIP: None
+  selector:
+    app: shopdeploy
+    component: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongodb
+---
+# Regular Service for application access
+apiVersion: v1
+kind: Service
+metadata:
+  name: mongo-service
+  namespace: shopdeploy
+  labels:
+    app: shopdeploy
+    component: mongodb
+spec:
+  type: ClusterIP
+  selector:
+    app: shopdeploy
+    component: mongodb
+  ports:
+    - port: 27017
+      targetPort: 27017
+      name: mongodb

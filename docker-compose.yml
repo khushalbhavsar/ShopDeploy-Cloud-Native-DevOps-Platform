@@ -1,6 +1,27 @@
-version: '3.8'
+# ShopDeploy - Docker Compose Configuration
+# Production-ready setup with MongoDB, Backend API, and Frontend
 
 services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:7.0
+    container_name: shopdeploy-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      - MONGO_INITDB_DATABASE=shopdeploy
+    volumes:
+      - mongodb_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    networks:
+      - shopdeploy-network
+
   # Backend API Service
   backend:
     build:
@@ -13,22 +34,25 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=5000
-      - MONGODB_URI=${MONGODB_URI}
-      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
-      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET}
+      - MONGODB_URI=mongodb://mongodb:27017/shopdeploy
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET:-your_super_secure_access_secret_key_here}
+      - JWT_REFRESH_SECRET=${JWT_REFRESH_SECRET:-your_super_secure_refresh_secret_key_here}
       - JWT_ACCESS_EXPIRE=${JWT_ACCESS_EXPIRE:-15m}
       - JWT_REFRESH_EXPIRE=${JWT_REFRESH_EXPIRE:-7d}
       - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
-      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
-      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME}
-      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY}
-      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET}
+      - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+      - CLOUDINARY_CLOUD_NAME=${CLOUDINARY_CLOUD_NAME:-}
+      - CLOUDINARY_API_KEY=${CLOUDINARY_API_KEY:-}
+      - CLOUDINARY_API_SECRET=${CLOUDINARY_API_SECRET:-}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:5000/api/health/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
+    depends_on:
+      mongodb:
+        condition: service_healthy
     networks:
       - shopdeploy-network
 
@@ -48,6 +72,10 @@ services:
         condition: service_healthy
     networks:
       - shopdeploy-network
+
+volumes:
+  mongodb_data:
+    driver: local
 
 networks:
   shopdeploy-network:
