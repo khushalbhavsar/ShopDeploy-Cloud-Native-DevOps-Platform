@@ -53,7 +53,7 @@ pipeline {
         )
         booleanParam(
             name: 'SKIP_TESTS',
-            defaultValue: true,
+            defaultValue: false,
             description: 'Skip running unit tests'
         )
         booleanParam(
