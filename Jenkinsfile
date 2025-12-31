@@ -45,24 +45,6 @@ pipeline {
         // ansiColor('xterm') - Requires AnsiColor plugin to be installed
     }
 
-    parameters {
-        choice(
-            name: 'ENVIRONMENT',
-            choices: ['dev', 'staging', 'prod'],
-            description: 'Target deployment environment'
-        )
-        booleanParam(
-            name: 'SKIP_TESTS',
-            defaultValue: false,
-            description: 'Skip running unit tests'
-        )
-        booleanParam(
-            name: 'FORCE_DEPLOY',
-            defaultValue: true,
-            description: 'Force deployment even without code changes'
-        )
-    }
-
     triggers {
         githubPush()
         // pollSCM('H/5 * * * *')  // Disabled - enable after fixing disk space
