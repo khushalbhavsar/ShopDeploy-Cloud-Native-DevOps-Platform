@@ -344,9 +344,6 @@ pipeline {
         // Stage 9: Security Scan (Trivy)
         //======================================================================
         stage('Security Scan') {
-            when {
-                expression { params.RUN_SECURITY_SCAN }
-            }
             parallel {
                 stage('Scan Backend Image') {
                     steps {
