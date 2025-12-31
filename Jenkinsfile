@@ -96,9 +96,9 @@ pipeline {
                         returnStdout: true
                     ).trim()
                     
-                    // Set environment variables
-                    env.BACKEND_CHANGED = (backendChanges != '' || params.FORCE_DEPLOY) ? 'true' : 'false'
-                    env.FRONTEND_CHANGED = (frontendChanges != '' || params.FORCE_DEPLOY) ? 'true' : 'false'
+                    // Set environment variables (FORCE_DEPLOY is always true since parameters removed)
+                    env.BACKEND_CHANGED = 'true'
+                    env.FRONTEND_CHANGED = 'true'
                     
                     echo "📦 Backend changed: ${env.BACKEND_CHANGED}"
                     echo "🎨 Frontend changed: ${env.FRONTEND_CHANGED}"
@@ -283,9 +283,9 @@ pipeline {
                         echo '🐳 Building frontend Docker image...'
                         script {
                             // Set API URL based on environment
-                            def apiUrl = params.ENVIRONMENT == 'prod' ? 
+                            def apiUrl = env.DEPLOY_ENV == 'prod' ? 
                                 'https://api.shopdeploy.com/api' : 
-                                "https://api-${params.ENVIRONMENT}.shopdeploy.com/api"
+                                "https://api-${env.DEPLOY_ENV}.shopdeploy.com/api"
                             
                             sh """
                                 docker build \
@@ -401,14 +401,8 @@ pipeline {
         // Stage 11: Deploy to Dev/Staging
         //======================================================================
         stage('Deploy to Dev/Staging') {
-            when {
-                expression { params.ENVIRONMENT != 'prod' }
-            }
-            environment {
-                DEPLOY_ENV = "${params.ENVIRONMENT}"
-            }
             steps {
-                echo "🚀 Deploying to ${params.ENVIRONMENT} environment..."
+                echo "🚀 Deploying to ${env.DEPLOY_ENV} environment..."
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials',
@@ -474,11 +468,11 @@ pipeline {
         }
 
         //======================================================================
-        // Stage 12: Production Approval
+        // Stage 12: Production Approval (Skipped - hardcoded to dev)
         //======================================================================
         stage('Production Approval') {
             when {
-                expression { params.ENVIRONMENT == 'prod' }
+                expression { env.DEPLOY_ENV == 'prod' }
             }
             steps {
                 script {
@@ -514,11 +508,11 @@ pipeline {
         }
 
         //======================================================================
-        // Stage 13: Deploy to Production
+        // Stage 13: Deploy to Production (Skipped - hardcoded to dev)
         //======================================================================
         stage('Deploy to Production') {
             when {
-                expression { params.ENVIRONMENT == 'prod' }
+                expression { env.DEPLOY_ENV == 'prod' }
             }
             steps {
                 echo '🚀 Deploying to PRODUCTION...'
@@ -651,7 +645,7 @@ pipeline {
         //======================================================================
         stage('Integration Tests') {
             when {
-                expression { params.ENVIRONMENT != 'prod' }
+                expression { env.DEPLOY_ENV != 'prod' }
             }
             steps {
                 echo '🧪 Running integration tests...'
@@ -703,7 +697,7 @@ pipeline {
                 ║  ✅ PIPELINE COMPLETED SUCCESSFULLY                       ║
                 ╠═══════════════════════════════════════════════════════════╣
                 ║  Build: #${BUILD_NUMBER}                                  
-                ║  Environment: ${params.ENVIRONMENT}                       
+                ║  Environment: ${env.DEPLOY_ENV}                       
                 ║  Image Tag: ${IMAGE_TAG}                                  
                 ║  Duration: ${currentBuild.durationString}                 
                 ╚═══════════════════════════════════════════════════════════╝
@@ -725,14 +719,14 @@ pipeline {
                 ║  ❌ PIPELINE FAILED                                       ║
                 ╠═══════════════════════════════════════════════════════════╣
                 ║  Build: #${BUILD_NUMBER}                                  
-                ║  Environment: ${params.ENVIRONMENT}                       
+                ║  Environment: ${env.DEPLOY_ENV}                       
                 ║  Stage: ${env.STAGE_NAME}                                 
                 ║  Check logs for details                                   
                 ╚═══════════════════════════════════════════════════════════╝
                 """
                 
                 // Attempt rollback for production failures
-                if (params.ENVIRONMENT == 'prod') {
+                if (env.DEPLOY_ENV == 'prod') {
                     echo '⚠️ Production deployment failed. Consider manual rollback.'
                 }
                 
