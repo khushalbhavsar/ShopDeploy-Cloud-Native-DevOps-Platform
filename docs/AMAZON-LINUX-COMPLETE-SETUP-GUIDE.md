@@ -4,6 +4,7 @@
   <img src="https://img.shields.io/badge/Amazon_Linux-2023-FF9900?style=for-the-badge&logo=amazon-aws" alt="Amazon Linux"/>
   <img src="https://img.shields.io/badge/Terraform-1.5+-7B42BC?style=for-the-badge&logo=terraform" alt="Terraform"/>
   <img src="https://img.shields.io/badge/Jenkins-LTS-D24939?style=for-the-badge&logo=jenkins" alt="Jenkins"/>
+  <img src="https://img.shields.io/badge/SonarQube-4E9BCD?style=for-the-badge&logo=sonarqube" alt="SonarQube"/>
   <img src="https://img.shields.io/badge/Kubernetes-EKS-326CE5?style=for-the-badge&logo=kubernetes" alt="EKS"/>
 </p>
 
@@ -19,11 +20,12 @@ This guide provides **step-by-step instructions** to set up the complete ShopDep
 4. [AWS CLI Configuration](#-step-4-aws-cli-configuration)
 5. [Terraform Setup & Infrastructure](#-step-5-terraform-setup--infrastructure)
 6. [Jenkins Setup & Configuration](#-step-6-jenkins-setup--configuration)
-7. [Deploy Application to EKS](#-step-7-deploy-application-to-eks)
-8. [Monitoring Setup (Prometheus & Grafana)](#-step-8-monitoring-setup-prometheus--grafana)
-9. [Dashboard Creation](#-step-9-dashboard-creation)
-10. [Verification & Testing](#-step-10-verification--testing)
-11. [Troubleshooting](#-troubleshooting)
+7. [SonarQube Setup & Configuration](#-step-7-sonarqube-setup--configuration)
+8. [Deploy Application to EKS](#-step-8-deploy-application-to-eks)
+9. [Monitoring Setup (Prometheus & Grafana)](#-step-9-monitoring-setup-prometheus--grafana)
+10. [Dashboard Creation](#-step-10-dashboard-creation)
+11. [Verification & Testing](#-step-11-verification--testing)
+12. [Troubleshooting](#-troubleshooting)
 
 ---
 
@@ -522,10 +524,298 @@ Click "Save"
 3. Monitor the pipeline stages
 
 ---
+## 🔍 Step 7: SonarQube Setup & Configuration
 
-## 🚀 Step 7: Deploy Application to EKS
+SonarQube is used for continuous code quality inspection and security vulnerability detection.
 
-### 7.1 Login to ECR
+### 7.1 Install SonarQube Using Docker
+
+```bash
+# Create a directory for SonarQube data
+sudo mkdir -p /opt/sonarqube/data
+sudo mkdir -p /opt/sonarqube/logs
+sudo mkdir -p /opt/sonarqube/extensions
+sudo chown -R 1000:1000 /opt/sonarqube
+
+# Set required system limits for Elasticsearch
+sudo sysctl -w vm.max_map_count=524288
+sudo sysctl -w fs.file-max=131072
+
+# Make it persistent
+echo "vm.max_map_count=524288" | sudo tee -a /etc/sysctl.conf
+echo "fs.file-max=131072" | sudo tee -a /etc/sysctl.conf
+
+# Run SonarQube container
+docker run -d --name sonarqube \
+    -p 9000:9000 \
+    -v /opt/sonarqube/data:/opt/sonarqube/data \
+    -v /opt/sonarqube/logs:/opt/sonarqube/logs \
+    -v /opt/sonarqube/extensions:/opt/sonarqube/extensions \
+    sonarqube:lts-community
+
+# Verify container is running
+docker ps | grep sonarqube
+
+# Check logs
+docker logs -f sonarqube
+```
+
+### 7.2 Access SonarQube Web UI
+
+1. Open browser: `http://<EC2-PUBLIC-IP>:9000`
+2. Default credentials:
+   - **Username:** `admin`
+   - **Password:** `admin`
+3. You will be prompted to change the password on first login
+
+### 7.3 Create SonarQube Project
+
+1. **Login to SonarQube**
+2. Click **"Create Project"** → **"Manually"**
+3. Configure project:
+   - **Project display name:** `ShopDeploy`
+   - **Project key:** `shopdeploy`
+   - Click **"Set Up"**
+
+4. **Generate Token:**
+   - Select **"Generate a token"**
+   - Token name: `jenkins-token`
+   - Click **"Generate"**
+   - **⚠️ Copy and save the token** (you won't see it again)
+
+5. **Select Analysis Method:**
+   - Choose **"Other CI"** for Jenkins integration
+   - Select **"JavaScript"** for frontend or appropriate language
+
+### 7.4 Install SonarQube Scanner
+
+```bash
+# Download SonarQube Scanner
+cd /opt
+sudo wget https://binaries.sonarsource.com/Distribution/sonar-scanner-cli/sonar-scanner-cli-5.0.1.3006-linux.zip
+
+# Unzip
+sudo unzip sonar-scanner-cli-5.0.1.3006-linux.zip
+sudo mv sonar-scanner-5.0.1.3006-linux sonar-scanner
+
+# Add to PATH
+echo 'export PATH=$PATH:/opt/sonar-scanner/bin' | sudo tee -a /etc/profile.d/sonar-scanner.sh
+source /etc/profile.d/sonar-scanner.sh
+
+# Verify installation
+sonar-scanner --version
+```
+
+### 7.5 Configure SonarQube Quality Gates
+
+1. Go to **Quality Gates** in SonarQube
+2. Click **"Create"** or use default **"Sonar way"**
+3. Recommended conditions:
+
+| Metric | Operator | Value |
+|--------|----------|-------|
+| Coverage | is less than | 80% |
+| Duplicated Lines (%) | is greater than | 3% |
+| Maintainability Rating | is worse than | A |
+| Reliability Rating | is worse than | A |
+| Security Hotspots Reviewed | is less than | 100% |
+| Security Rating | is worse than | A |
+
+### 7.6 Integrate SonarQube with Jenkins
+
+#### Install SonarQube Plugin in Jenkins:
+
+1. Go to **Manage Jenkins → Plugins → Available plugins**
+2. Search and install:
+   - **SonarQube Scanner**
+   - **Sonar Quality Gates Plugin**
+3. Restart Jenkins
+
+#### Configure SonarQube Server in Jenkins:
+
+1. Go to **Manage Jenkins → System**
+2. Scroll to **SonarQube servers**
+3. Click **"Add SonarQube"**
+4. Configure:
+   - **Name:** `SonarQube`
+   - **Server URL:** `http://<EC2-PUBLIC-IP>:9000`
+   - **Server authentication token:** Add credentials
+     - Kind: **Secret text**
+     - Secret: Your SonarQube token
+     - ID: `sonarqube-token`
+5. Click **Save**
+
+#### Configure SonarQube Scanner in Jenkins:
+
+1. Go to **Manage Jenkins → Tools**
+2. Scroll to **SonarQube Scanner installations**
+3. Click **"Add SonarQube Scanner"**
+4. Configure:
+   - **Name:** `SonarScanner`
+   - **Install automatically:** ✓ Check this
+   - **Version:** Select latest version
+5. Click **Save**
+
+### 7.7 Add SonarQube Stage to Jenkinsfile
+
+Add the following stage to your `Jenkinsfile`:
+
+```groovy
+// Add environment variable
+environment {
+    SONAR_SCANNER_HOME = tool 'SonarScanner'
+}
+
+// Add SonarQube analysis stage
+stage('SonarQube Analysis') {
+    steps {
+        withSonarQubeEnv('SonarQube') {
+            sh '''
+                ${SONAR_SCANNER_HOME}/bin/sonar-scanner \
+                    -Dsonar.projectKey=shopdeploy \
+                    -Dsonar.projectName=ShopDeploy \
+                    -Dsonar.sources=. \
+                    -Dsonar.sourceEncoding=UTF-8 \
+                    -Dsonar.javascript.lcov.reportPaths=coverage/lcov.info \
+                    -Dsonar.exclusions=**/node_modules/**,**/coverage/**,**/*.test.js
+            '''
+        }
+    }
+}
+
+// Add Quality Gate stage
+stage('Quality Gate') {
+    steps {
+        timeout(time: 5, unit: 'MINUTES') {
+            waitForQualityGate abortPipeline: true
+        }
+    }
+}
+```
+
+### 7.8 Create sonar-project.properties File
+
+Create this file in your project root:
+
+```properties
+# Project identification
+sonar.projectKey=shopdeploy
+sonar.projectName=ShopDeploy
+sonar.projectVersion=1.0
+
+# Source directories
+sonar.sources=shopdeploy-backend/src,shopdeploy-frontend/src
+
+# Exclusions
+sonar.exclusions=**/node_modules/**,**/coverage/**,**/dist/**,**/*.test.js,**/*.spec.js
+
+# Test directories
+sonar.tests=shopdeploy-backend/src,shopdeploy-frontend/src
+sonar.test.inclusions=**/*.test.js,**/*.spec.js
+
+# Coverage reports
+sonar.javascript.lcov.reportPaths=shopdeploy-backend/coverage/lcov.info,shopdeploy-frontend/coverage/lcov.info
+
+# Encoding
+sonar.sourceEncoding=UTF-8
+```
+
+### 7.9 Run SonarQube Analysis Manually
+
+```bash
+# Navigate to project directory
+cd ~/ShopDeploy
+
+# Run SonarQube analysis
+sonar-scanner \
+    -Dsonar.host.url=http://localhost:9000 \
+    -Dsonar.login=YOUR_SONARQUBE_TOKEN
+
+# Check analysis results
+echo "Analysis complete! View results at http://<EC2-PUBLIC-IP>:9000/dashboard?id=shopdeploy"
+```
+
+### 7.10 SonarQube with Docker Compose (Alternative)
+
+For production setup with PostgreSQL database:
+
+```yaml
+# docker-compose-sonarqube.yml
+version: "3.8"
+
+services:
+  sonarqube:
+    image: sonarqube:lts-community
+    container_name: sonarqube
+    depends_on:
+      - db
+    environment:
+      SONAR_JDBC_URL: jdbc:postgresql://db:5432/sonar
+      SONAR_JDBC_USERNAME: sonar
+      SONAR_JDBC_PASSWORD: sonar
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+      - sonarqube_logs:/opt/sonarqube/logs
+    ports:
+      - "9000:9000"
+    networks:
+      - sonarnet
+
+  db:
+    image: postgres:15
+    container_name: sonarqube-db
+    environment:
+      POSTGRES_USER: sonar
+      POSTGRES_PASSWORD: sonar
+      POSTGRES_DB: sonar
+    volumes:
+      - postgresql:/var/lib/postgresql
+      - postgresql_data:/var/lib/postgresql/data
+    networks:
+      - sonarnet
+
+networks:
+  sonarnet:
+    driver: bridge
+
+volumes:
+  sonarqube_data:
+  sonarqube_extensions:
+  sonarqube_logs:
+  postgresql:
+  postgresql_data:
+```
+
+```bash
+# Deploy SonarQube with PostgreSQL
+docker-compose -f docker-compose-sonarqube.yml up -d
+```
+
+### 7.11 Verify SonarQube Installation
+
+```bash
+# Check SonarQube container status
+docker ps | grep sonarqube
+
+# Check SonarQube logs
+docker logs sonarqube
+
+# Test SonarQube API
+curl -s http://localhost:9000/api/system/status | jq .
+
+# Expected output:
+# {
+#   "id": "...",
+#   "version": "...",
+#   "status": "UP"
+# }
+```
+
+---
+## 🚀 Step 8: Deploy Application to EKS
+
+### 8.1 Login to ECR
 
 ```bash
 # Get ECR login command from Terraform output
@@ -535,7 +825,7 @@ eval $(terraform output -raw ecr_login_command)
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT-ID>.dkr.ecr.us-east-1.amazonaws.com
 ```
 
-### 7.2 Build and Push Docker Images
+### 8.2 Build and Push Docker Images
 
 ```bash
 # Navigate to backend
@@ -563,7 +853,7 @@ docker tag shopdeploy-frontend:latest <ECR-FRONTEND-URL>:latest
 docker push <ECR-FRONTEND-URL>:latest
 ```
 
-### 7.3 Deploy Using Helm
+### 8.3 Deploy Using Helm
 
 ```bash
 # Create namespace
@@ -585,7 +875,7 @@ helm upgrade --install shopdeploy-frontend ./helm/frontend \
     --values ./helm/frontend/values-prod.yaml
 ```
 
-### 7.4 Verify Deployment
+### 8.4 Verify Deployment
 
 ```bash
 # Check pods
@@ -600,9 +890,9 @@ kubectl get ingress -n shopdeploy
 
 ---
 
-## 📊 Step 8: Monitoring Setup (Prometheus & Grafana)
+## 📊 Step 9: Monitoring Setup (Prometheus & Grafana)
 
-### 8.1 Automated Installation
+### 9.1 Automated Installation
 
 ```bash
 # Set Grafana admin password
@@ -618,7 +908,7 @@ chmod +x install-monitoring.sh
 ./install-monitoring.sh monitoring
 ```
 
-### 8.2 Manual Installation
+### 9.2 Manual Installation
 
 ```bash
 # Add Helm repositories
@@ -643,7 +933,7 @@ helm upgrade --install grafana grafana/grafana \
     --wait --timeout 10m
 ```
 
-### 8.3 Access Monitoring Tools
+### 9.3 Access Monitoring Tools
 
 ```bash
 # Get Grafana LoadBalancer URL
@@ -662,7 +952,7 @@ kubectl port-forward svc/prometheus-server 9090:80 -n monitoring &
   - Password: The password you set
 - **Prometheus:** `http://localhost:9090`
 
-### 8.4 Verify Monitoring Installation
+### 9.4 Verify Monitoring Installation
 
 ```bash
 # Check monitoring pods
@@ -679,9 +969,9 @@ kubectl get pods -n monitoring
 
 ---
 
-## 📈 Step 9: Dashboard Creation
+## 📈 Step 10: Dashboard Creation
 
-### 9.1 Import ShopDeploy Dashboard
+### 10.1 Import ShopDeploy Dashboard
 
 1. **Login to Grafana** (`http://<GRAFANA-URL>:3000`)
 
@@ -697,7 +987,7 @@ kubectl get pods -n monitoring
    - Select Prometheus data source
    - Click: "Import"
 
-### 9.2 Create Custom Dashboards
+### 10.2 Create Custom Dashboards
 
 #### Create Kubernetes Overview Dashboard:
 
@@ -724,7 +1014,7 @@ sum(container_memory_usage_bytes{namespace="shopdeploy"}) by (pod) / 1024 / 1024
 sum(rate(http_requests_total{namespace="shopdeploy"}[5m])) by (service)
 ```
 
-### 9.3 Import Community Dashboards
+### 10.3 Import Community Dashboards
 
 Import these popular dashboards from Grafana.com:
 
@@ -742,7 +1032,7 @@ Import these popular dashboards from Grafana.com:
 4. Select Prometheus data source
 5. Click "Import"
 
-### 9.4 Configure Alerting
+### 10.4 Configure Alerting
 
 1. **Go to:** Alerting → Alert rules → New alert rule
 
@@ -758,9 +1048,9 @@ Import these popular dashboards from Grafana.com:
 
 ---
 
-## ✅ Step 10: Verification & Testing
+## ✅ Step 11: Verification & Testing
 
-### 10.1 Infrastructure Verification
+### 11.1 Infrastructure Verification
 
 ```bash
 # Check all AWS resources
@@ -774,7 +1064,7 @@ kubectl get nodes -o wide
 kubectl get ns
 ```
 
-### 10.2 Application Verification
+### 11.2 Application Verification
 
 ```bash
 # Check shopdeploy pods
@@ -791,7 +1081,7 @@ kubectl logs -n shopdeploy -l app=shopdeploy-backend --tail=50
 kubectl logs -n shopdeploy -l app=shopdeploy-frontend --tail=50
 ```
 
-### 10.3 Monitoring Verification
+### 11.3 Monitoring Verification
 
 ```bash
 # Check monitoring pods
@@ -806,7 +1096,7 @@ kubectl port-forward svc/grafana 3000:80 -n monitoring &
 # Open http://localhost:3000
 ```
 
-### 10.4 End-to-End Test
+### 11.4 End-to-End Test
 
 ```bash
 # Get application URL
@@ -893,6 +1183,38 @@ kubectl get svc -n monitoring
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin <ACCOUNT-ID>.dkr.ecr.us-east-1.amazonaws.com
 ```
 
+#### 7. SonarQube Not Starting
+
+```bash
+# Check if vm.max_map_count is set
+sysctl vm.max_map_count
+
+# If not set or too low
+sudo sysctl -w vm.max_map_count=524288
+
+# Check SonarQube logs for errors
+docker logs sonarqube
+
+# Restart SonarQube container
+docker restart sonarqube
+
+# If permission issues
+sudo chown -R 1000:1000 /opt/sonarqube
+```
+
+#### 8. SonarQube Quality Gate Fails
+
+```bash
+# Check SonarQube project status
+curl -u admin:YOUR_PASSWORD "http://localhost:9000/api/qualitygates/project_status?projectKey=shopdeploy"
+
+# View analysis logs
+cat .scannerwork/report-task.txt
+
+# Re-run analysis with debug
+sonar-scanner -X -Dsonar.host.url=http://localhost:9000 -Dsonar.login=YOUR_TOKEN
+```
+
 ---
 
 ## 📝 Quick Reference Commands
@@ -925,6 +1247,13 @@ docker logs <container>             # View logs
 # === MONITORING ===
 kubectl port-forward svc/grafana 3000:80 -n monitoring &
 kubectl port-forward svc/prometheus-server 9090:80 -n monitoring &
+
+# === SONARQUBE ===
+docker start sonarqube             # Start SonarQube
+docker stop sonarqube              # Stop SonarQube
+docker logs -f sonarqube           # View logs
+sonar-scanner                      # Run code analysis
+curl http://localhost:9000/api/system/status  # Check status
 ```
 
 ---
@@ -939,6 +1268,7 @@ You now have a fully configured ShopDeploy environment with:
 | ✅ EKS Cluster | Running | kubectl |
 | ✅ ECR Repositories | Created | Docker push |
 | ✅ Jenkins | Configured | `http://<EC2-IP>:8080` |
+| ✅ SonarQube | Code Quality | `http://<EC2-IP>:9000` |
 | ✅ Prometheus | Monitoring | `http://localhost:9090` |
 | ✅ Grafana | Dashboards | `http://localhost:3000` |
 | ✅ Application | Deployed | `http://<LB-URL>` |
@@ -950,6 +1280,7 @@ You now have a fully configured ShopDeploy environment with:
 - [Terraform Documentation](https://www.terraform.io/docs)
 - [AWS EKS Documentation](https://docs.aws.amazon.com/eks/)
 - [Jenkins Documentation](https://www.jenkins.io/doc/)
+- [SonarQube Documentation](https://docs.sonarqube.org/latest/)
 - [Helm Documentation](https://helm.sh/docs/)
 - [Prometheus Documentation](https://prometheus.io/docs/)
 - [Grafana Documentation](https://grafana.com/docs/)
