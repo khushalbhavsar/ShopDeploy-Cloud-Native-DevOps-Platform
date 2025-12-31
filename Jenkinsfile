@@ -57,19 +57,9 @@ pipeline {
             description: 'Skip running unit tests'
         )
         booleanParam(
-            name: 'SKIP_SONAR',
-            defaultValue: false,
-            description: 'Skip SonarQube analysis'
-        )
-        booleanParam(
             name: 'FORCE_DEPLOY',
             defaultValue: true,
             description: 'Force deployment even without code changes'
-        )
-        booleanParam(
-            name: 'RUN_SECURITY_SCAN',
-            defaultValue: true,
-            description: 'Run Docker image security scan'
         )
     }
 
@@ -203,9 +193,6 @@ pipeline {
         // Stage 5: Unit Tests
         //======================================================================
         stage('Unit Tests') {
-            when {
-                expression { !params.SKIP_TESTS }
-            }
             parallel {
                 stage('Backend Tests') {
                     steps {
@@ -246,9 +233,6 @@ pipeline {
         // Stage 6: SonarQube Analysis
         //======================================================================
         stage('SonarQube Analysis') {
-            when {
-                expression { params.SKIP_SONAR == false }
-            }
             steps {
                 echo '📊 Running SonarQube analysis...'
                 script {
@@ -277,9 +261,6 @@ pipeline {
         // Stage 7: Quality Gate
         //======================================================================
         stage('Quality Gate') {
-            when {
-                expression { params.SKIP_SONAR == false }
-            }
             steps {
                 echo '🚦 Checking Quality Gate...'
                 script {
@@ -438,6 +419,12 @@ pipeline {
         // Stage 11: Deploy to Dev/Staging
         //======================================================================
         stage('Deploy to Dev/Staging') {
+            when {
+                expression { params.ENVIRONMENT != 'prod' }
+            }
+            environment {
+                DEPLOY_ENV = "${params.ENVIRONMENT}"
+            }
             steps {
                 echo "🚀 Deploying to ${params.ENVIRONMENT} environment..."
                 withCredentials([[
@@ -508,7 +495,9 @@ pipeline {
         // Stage 12: Production Approval
         //======================================================================
         stage('Production Approval') {
-
+            when {
+                expression { params.ENVIRONMENT == 'prod' }
+            }
             steps {
                 script {
                     echo '⏳ Waiting for production deployment approval...'
@@ -546,6 +535,9 @@ pipeline {
         // Stage 13: Deploy to Production
         //======================================================================
         stage('Deploy to Production') {
+            when {
+                expression { params.ENVIRONMENT == 'prod' }
+            }
             steps {
                 echo '🚀 Deploying to PRODUCTION...'
                 withCredentials([[
@@ -676,6 +668,9 @@ pipeline {
         // Stage 15: Integration Tests
         //======================================================================
         stage('Integration Tests') {
+            when {
+                expression { params.ENVIRONMENT != 'prod' }
+            }
             steps {
                 echo '🧪 Running integration tests...'
                 script {
