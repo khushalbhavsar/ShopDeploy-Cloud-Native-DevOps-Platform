@@ -45,6 +45,34 @@ pipeline {
         // ansiColor('xterm') - Requires AnsiColor plugin to be installed
     }
 
+    parameters {
+        choice(
+            name: 'ENVIRONMENT',
+            choices: ['dev', 'staging', 'prod'],
+            description: 'Target deployment environment'
+        )
+        booleanParam(
+            name: 'SKIP_TESTS',
+            defaultValue: false,
+            description: 'Skip running unit tests'
+        )
+        booleanParam(
+            name: 'SKIP_SONAR',
+            defaultValue: false,
+            description: 'Skip SonarQube analysis'
+        )
+        booleanParam(
+            name: 'FORCE_DEPLOY',
+            defaultValue: true,
+            description: 'Force deployment even without code changes'
+        )
+        booleanParam(
+            name: 'RUN_SECURITY_SCAN',
+            defaultValue: true,
+            description: 'Run Docker image security scan'
+        )
+    }
+
     triggers {
         githubPush()
         // pollSCM('H/5 * * * *')  // Disabled - enable after fixing disk space
@@ -96,9 +124,9 @@ pipeline {
                         returnStdout: true
                     ).trim()
                     
-                    // Set environment variables (FORCE_DEPLOY is always true since parameters removed)
-                    env.BACKEND_CHANGED = 'true'
-                    env.FRONTEND_CHANGED = 'true'
+                    // Set environment variables
+                    env.BACKEND_CHANGED = (backendChanges != '' || params.FORCE_DEPLOY) ? 'true' : 'false'
+                    env.FRONTEND_CHANGED = (frontendChanges != '' || params.FORCE_DEPLOY) ? 'true' : 'false'
                     
                     echo "📦 Backend changed: ${env.BACKEND_CHANGED}"
                     echo "🎨 Frontend changed: ${env.FRONTEND_CHANGED}"
@@ -175,6 +203,9 @@ pipeline {
         // Stage 5: Unit Tests
         //======================================================================
         stage('Unit Tests') {
+            when {
+                expression { !params.SKIP_TESTS }
+            }
             parallel {
                 stage('Backend Tests') {
                     steps {
@@ -215,6 +246,9 @@ pipeline {
         // Stage 6: SonarQube Analysis
         //======================================================================
         stage('SonarQube Analysis') {
+            when {
+                expression { params.SKIP_SONAR == false }
+            }
             steps {
                 echo '📊 Running SonarQube analysis...'
                 script {
@@ -243,6 +277,9 @@ pipeline {
         // Stage 7: Quality Gate
         //======================================================================
         stage('Quality Gate') {
+            when {
+                expression { params.SKIP_SONAR == false }
+            }
             steps {
                 echo '🚦 Checking Quality Gate...'
                 script {
@@ -283,9 +320,9 @@ pipeline {
                         echo '🐳 Building frontend Docker image...'
                         script {
                             // Set API URL based on environment
-                            def apiUrl = env.DEPLOY_ENV == 'prod' ? 
+                            def apiUrl = params.ENVIRONMENT == 'prod' ? 
                                 'https://api.shopdeploy.com/api' : 
-                                "https://api-${env.DEPLOY_ENV}.shopdeploy.com/api"
+                                "https://api-${params.ENVIRONMENT}.shopdeploy.com/api"
                             
                             sh """
                                 docker build \
@@ -307,6 +344,9 @@ pipeline {
         // Stage 9: Security Scan (Trivy)
         //======================================================================
         stage('Security Scan') {
+            when {
+                expression { params.RUN_SECURITY_SCAN } // Only run if enabled
+            }
             parallel {
                 stage('Scan Backend Image') {
                     steps {
@@ -401,8 +441,14 @@ pipeline {
         // Stage 11: Deploy to Dev/Staging
         //======================================================================
         stage('Deploy to Dev/Staging') {
+            when {
+                expression { params.ENVIRONMENT != 'prod' }
+            }
+            environment {
+                DEPLOY_ENV = "${params.ENVIRONMENT}"
+            }
             steps {
-                echo "🚀 Deploying to ${env.DEPLOY_ENV} environment..."
+                echo "🚀 Deploying to ${params.ENVIRONMENT} environment..."
                 withCredentials([[
                     $class: 'AmazonWebServicesCredentialsBinding',
                     credentialsId: 'aws-credentials',
@@ -468,11 +514,11 @@ pipeline {
         }
 
         //======================================================================
-        // Stage 12: Production Approval (Skipped - hardcoded to dev)
+        // Stage 12: Production Approval
         //======================================================================
         stage('Production Approval') {
             when {
-                expression { env.DEPLOY_ENV == 'prod' }
+                expression { params.ENVIRONMENT == 'prod' }
             }
             steps {
                 script {
@@ -508,11 +554,11 @@ pipeline {
         }
 
         //======================================================================
-        // Stage 13: Deploy to Production (Skipped - hardcoded to dev)
+        // Stage 13: Deploy to Production
         //======================================================================
         stage('Deploy to Production') {
             when {
-                expression { env.DEPLOY_ENV == 'prod' }
+                expression { params.ENVIRONMENT == 'prod' }
             }
             steps {
                 echo '🚀 Deploying to PRODUCTION...'
@@ -645,7 +691,7 @@ pipeline {
         //======================================================================
         stage('Integration Tests') {
             when {
-                expression { env.DEPLOY_ENV != 'prod' }
+                expression { params.ENVIRONMENT != 'prod' }
             }
             steps {
                 echo '🧪 Running integration tests...'
@@ -697,7 +743,7 @@ pipeline {
                 ║  ✅ PIPELINE COMPLETED SUCCESSFULLY                       ║
                 ╠═══════════════════════════════════════════════════════════╣
                 ║  Build: #${BUILD_NUMBER}                                  
-                ║  Environment: ${env.DEPLOY_ENV}                       
+                ║  Environment: ${params.ENVIRONMENT}                       
                 ║  Image Tag: ${IMAGE_TAG}                                  
                 ║  Duration: ${currentBuild.durationString}                 
                 ╚═══════════════════════════════════════════════════════════╝
@@ -719,14 +765,14 @@ pipeline {
                 ║  ❌ PIPELINE FAILED                                       ║
                 ╠═══════════════════════════════════════════════════════════╣
                 ║  Build: #${BUILD_NUMBER}                                  
-                ║  Environment: ${env.DEPLOY_ENV}                       
+                ║  Environment: ${params.ENVIRONMENT}                       
                 ║  Stage: ${env.STAGE_NAME}                                 
                 ║  Check logs for details                                   
                 ╚═══════════════════════════════════════════════════════════╝
                 """
                 
                 // Attempt rollback for production failures
-                if (env.DEPLOY_ENV == 'prod') {
+                if (params.ENVIRONMENT == 'prod') {
                     echo '⚠️ Production deployment failed. Consider manual rollback.'
                 }
                 
